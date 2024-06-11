@@ -64,8 +64,8 @@ spec:
             volumes:
               - name: model
                 hostPath:
-                path: "/data/model/Mistral-7B-Instruct-v02-AWQ"
-                type: Directory
+                  path: "/data/model/Mistral-7B-Instruct-v02-AWQ"
+                  type: Directory
             containers:
               - name: ray-worker # must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc'
                 image: docker.io/library/rayvllm:latest
