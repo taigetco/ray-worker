@@ -86,8 +86,8 @@ spec:
                 volumeMounts:
                   - mountPath: /data/model/Mistral-7B-Instruct-v02-AWQ
                     name: model
-            volumes:
-              - name: model
-                hostPath:
-                path: "/data/model/Mistral-7B-Instruct-v02-AWQ"
-                type: Directory
+          volumes:
+            - name: model
+              hostPath:
+              path: "/data/model/Mistral-7B-Instruct-v02-AWQ"
+              type: Directory
