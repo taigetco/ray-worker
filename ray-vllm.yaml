@@ -65,6 +65,11 @@ spec:
               - name: ray-worker # must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc'
                 image: docker.io/library/rayvllm:latest
                 imagePullPolicy: Never
+                env:
+                  - name: HF_ENDPOINT
+                    value: https://hf-mirror.com
+                  - name: HUGGING_FACE_HUB_TOKEN
+                    value: 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
                 lifecycle:
                   preStop:
                     exec:
@@ -78,3 +83,11 @@ spec:
                     cpu: "2"
                     memory: "2Gi"
                     nvidia.com/gpu: "1"
+                volumeMounts:
+                  - mountPath: /data/model/Mistral-7B-Instruct-v02-AWQ
+                    name: model
+            volumes:
+              - name: model
+                hostPath:
+                path: "/data/model/Mistral-7B-Instruct-v02-AWQ"
+                type: Directory
