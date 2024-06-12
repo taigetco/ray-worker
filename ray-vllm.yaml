@@ -9,7 +9,7 @@ spec:
         import_path: llm:build_app
         route_prefix: /
         runtime_env:
-          working_dir: "https://github.com/taigetco/ray-worker/raw/main/llm.py.zip"
+          working_dir: "https://github.com/taigetco/ray-worker/raw/main/llm.zip"
         deployments:
           - name: VLLMDeployment
             model: "/data/model/Mistral-7B-Instruct-v02-AWQ"
