@@ -3,6 +3,10 @@ kind: RayService
 metadata:
   name: rayservice-sample
 spec:
+  serveConfigV2: |
+    applications:
+      - name: vllm_app
+        route_prefix: /fruit
   rayClusterConfig:
     rayVersion: '2.9.0' # should match the Ray version in the image of the containers
     ######################headGroupSpecs#################################
