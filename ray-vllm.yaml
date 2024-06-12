@@ -6,7 +6,14 @@ spec:
   serveConfigV2: |
     applications:
       - name: vllm_app
-        route_prefix: /fruit
+        route_prefix: /vllm
+        import_path: llm.deployment_graph
+        runtime_env:
+          working_dir: "https://github.com/taigetco/ray-worker/raw/main/llm.zip"
+        deployments:
+          - name: VLLMDeployment
+            model: "/data/model/Mistral-7B-Instruct-v02-AWQ"
+            tensor-parallel-size: 1
   rayClusterConfig:
     rayVersion: '2.9.0' # should match the Ray version in the image of the containers
     ######################headGroupSpecs#################################
