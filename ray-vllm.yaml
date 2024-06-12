@@ -93,11 +93,11 @@ spec:
                       command: ["/bin/sh","-c","ray stop"]
                 resources:
                   limits:
-                    cpu: "3"
+                    cpu: "6"
                     memory: "2Gi"
                     nvidia.com/gpu: "1"
                   requests:
-                    cpu: "3"
+                    cpu: "2"
                     memory: "2Gi"
                     nvidia.com/gpu: "1"
                 volumeMounts:
