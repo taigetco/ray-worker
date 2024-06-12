@@ -27,6 +27,13 @@ spec:
       #pod template
       template:
         spec:
+          volumes:
+            - name: model
+              hostPath:
+                path: "/data/model/Mistral-7B-Instruct-v02-AWQ"
+                type: Directory
+          nodeSelector:
+            role: head
           containers:
             - name: ray-head
               image: docker.io/library/rayvllm:latest
@@ -47,6 +54,9 @@ spec:
                   name: client
                 - containerPort: 8000
                   name: serve
+              volumeMounts:
+                - mountPath: /data/model/Mistral-7B-Instruct-v02-AWQ
+                  name: model
     workerGroupSpecs:
       # the pod replicas in this group typed worker
       - replicas: 1
@@ -61,6 +71,8 @@ spec:
         #pod template
         template:
           spec:
+            nodeSelector:
+              role: worker
             volumes:
               - name: model
                 hostPath:
