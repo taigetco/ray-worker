@@ -40,10 +40,10 @@ spec:
               imagePullPolicy: Never
               resources:
                 limits:
-                  cpu: 1
+                  cpu: 8
                   memory: 2Gi
                 requests:
-                  cpu: 1
+                  cpu: 8
                   memory: 2Gi
               ports:
                 - containerPort: 6379
@@ -97,7 +97,7 @@ spec:
                     memory: "2Gi"
                     nvidia.com/gpu: "1"
                   requests:
-                    cpu: "2"
+                    cpu: "4"
                     memory: "2Gi"
                     nvidia.com/gpu: "1"
                 volumeMounts:
