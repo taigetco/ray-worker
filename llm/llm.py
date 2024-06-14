@@ -132,4 +132,4 @@ def build_app(cli_args: Dict[str, str]) -> serve.Application:
     )
 
 
-deployment_graph = build_app([])
+deployment_graph = build_app({})
