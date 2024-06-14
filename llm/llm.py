@@ -5,9 +5,9 @@ import logging
 from fastapi import FastAPI
 from starlette.requests import Request
 from starlette.responses import StreamingResponse, JSONResponse
-
+import torch
 from ray import serve
-
+from vllm.config import ModelConfig
 from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.engine.async_llm_engine import AsyncLLMEngine
 from vllm.entrypoints.openai.cli_args import make_arg_parser
@@ -43,14 +43,20 @@ class VLLMDeployment:
     ):
         logger.info(f"Starting with engine args: {engine_args}")
         self.engine = AsyncLLMEngine.from_engine_args(engine_args)
-
+        model_config = ModelConfig(max_model_len=8192, model='/data/model/Mistral-7B-Instruct-v02-AWQ', 
+                                   tokenizer='/data/model/Mistral-7B-Instruct-v02-AWQ',
+                                   tokenizer_mode='auto',
+                                   trust_remote_code=False,
+                                   dtype=torch.float16,
+                                   seed=0,
+                                  )
         # Determine the name of the served model for the OpenAI client.
         if engine_args.served_model_name is not None:
             served_model_names = engine_args.served_model_name
         else:
             served_model_names = [engine_args.model]
         self.openai_serving_chat = OpenAIServingChat(
-            self.engine, served_model_names, response_role, lora_modules, chat_template
+            self.engine, model_config, served_model_names, response_role, lora_modules, chat_template
         )
 
     @app.post("/v1/chat/completions")
@@ -105,6 +111,7 @@ def build_app(cli_args: Dict[str, str]) -> serve.Application:
     parsed_args = parse_vllm_args(cli_args)
     engine_args = AsyncEngineArgs.from_cli_args(parsed_args)
     engine_args.worker_use_ray = True
+    engine_args.max_model_len = 8192
 
     tp = engine_args.tensor_parallel_size
     logger.info(f"Tensor parallelism = {tp}")
@@ -125,4 +132,4 @@ def build_app(cli_args: Dict[str, str]) -> serve.Application:
     )
 
 
-deployment_graph = VLLMDeployment.bind()
+deployment_graph = build_app([])
