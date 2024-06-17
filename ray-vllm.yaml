@@ -10,6 +10,10 @@ spec:
         import_path: llm.deployment_graph
         runtime_env:
           working_dir: "https://github.com/taigetco/ray-worker/raw/main/llm.zip"
+        args:
+          model: '/data/model/Mistral-7B-Instruct-v02-AWQ'
+          tensor-parallel-size: 1
+          max-model-len: 8192
         deployments:
           - name: VLLMDeployment
             model: "/data/model/Mistral-7B-Instruct-v02-AWQ"

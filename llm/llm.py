@@ -98,7 +98,7 @@ def parse_vllm_args(cli_args: Dict[str, str]):
     return parsed_args
 
 
-def build_app(cli_args: Dict[str, str]) -> serve.Application:
+def build_app(args: Dict[str, str]) -> serve.Application:
     """Builds the Serve app based on CLI arguments.
 
     See https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html#command-line-arguments-for-the-server
@@ -106,12 +106,12 @@ def build_app(cli_args: Dict[str, str]) -> serve.Application:
 
     Supported engine arguments: https://docs.vllm.ai/en/latest/models/engine_args.html.
     """  # noqa: E501
-    cli_args['model'] = '/data/model/Mistral-7B-Instruct-v02-AWQ'
-    cli_args['tensor-parallel-size'] = '1'
-    parsed_args = parse_vllm_args(cli_args)
+    # args['model'] = '/data/model/Mistral-7B-Instruct-v02-AWQ'
+    # args['tensor-parallel-size'] = '1'
+    parsed_args = parse_vllm_args(args)
     engine_args = AsyncEngineArgs.from_cli_args(parsed_args)
     engine_args.worker_use_ray = True
-    engine_args.max_model_len = 8192
+    # engine_args.max_model_len = 8192
 
     tp = engine_args.tensor_parallel_size
     logger.info(f"Tensor parallelism = {tp}")
@@ -130,6 +130,5 @@ def build_app(cli_args: Dict[str, str]) -> serve.Application:
         parsed_args.lora_modules,
         parsed_args.chat_template,
     )
-
 
 deployment_graph = build_app({})
