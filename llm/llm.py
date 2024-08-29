@@ -1,11 +1,9 @@
-# __serve_example_begin__
 from typing import Dict, Optional, List
 import logging
-
+import asyncio
 from fastapi import FastAPI
 from starlette.requests import Request
 from starlette.responses import StreamingResponse, JSONResponse
-import torch
 from ray import serve
 from vllm.config import ModelConfig
 from vllm.engine.arg_utils import AsyncEngineArgs
@@ -17,21 +15,16 @@ from vllm.entrypoints.openai.protocol import (
     ErrorResponse,
 )
 from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
+from vllm.entrypoints.openai.serving_completion import OpenAIServingCompletion
+from vllm.entrypoints.openai.serving_embedding import OpenAIServingEmbedding
 from vllm.entrypoints.openai.serving_engine import LoRAModulePath
+from vllm.usage.usage_lib import UsageContext
 
 logger = logging.getLogger("ray.serve")
 
 app = FastAPI()
 
-
-@serve.deployment(
-    autoscaling_config={
-        "min_replicas": 1,
-        "max_replicas": 2,
-        "target_ongoing_requests": 5,
-    },
-    max_ongoing_requests=10,
-)
+@serve.deployment(num_replicas=1)
 @serve.ingress(app)
 class VLLMDeployment:
     def __init__(
@@ -42,32 +35,42 @@ class VLLMDeployment:
         chat_template: Optional[str] = None,
     ):
         logger.info(f"Starting with engine args: {engine_args}")
-        self.engine = AsyncLLMEngine.from_engine_args(engine_args)
-        model_config = ModelConfig(max_model_len=8192, model='/data/model/Mistral-7B-Instruct-v02-AWQ', 
-                                   tokenizer='/data/model/Mistral-7B-Instruct-v02-AWQ',
-                                   tokenizer_mode='auto',
-                                   trust_remote_code=False,
-                                   dtype=torch.float16,
-                                   seed=0,
-                                  )
-        # Determine the name of the served model for the OpenAI client.
+        self.engine = AsyncLLMEngine.from_engine_args(engine_args, usage_context=UsageContext.OPENAI_API_SERVER)
+
         if engine_args.served_model_name is not None:
-            served_model_names = engine_args.served_model_name
+            self.served_model_names = engine_args.served_model_name
         else:
-            served_model_names = [engine_args.model]
-        self.openai_serving_chat = OpenAIServingChat(
-            self.engine, model_config, served_model_names, response_role, lora_modules, chat_template
-        )
+            self.served_model_names = [engine_args.model]
+
+        self.model_config = None
+
+        asyncio.create_task(self.load_model_config(response_role, lora_modules, chat_template))
+
+        self.openai_serving_chat = None
+        self.openai_serving_completion = None
+        self.openai_serving_embedding = None
+
+    async def load_model_config(self, response_role: str,
+                                lora_modules: Optional[List[LoRAModulePath]] = None,
+                                chat_template: Optional[str] = None):
+        model_config = await self.engine.get_model_config()
+        self.model_config = model_config
+        self.openai_serving_chat = OpenAIServingChat(self.engine, model_config,
+                                                     self.served_model_names,
+                                                     response_role,
+                                                     lora_modules,
+                                                     chat_template)
+
+        self.openai_serving_completion = OpenAIServingCompletion(self.engine, model_config,
+                                                                 self.served_model_names, lora_modules)
 
     @app.post("/v1/chat/completions")
     async def create_chat_completion(
         self, request: ChatCompletionRequest, raw_request: Request
     ):
-        """OpenAI-compatible HTTP endpoint.
+        if self.openai_serving_chat is None:
+            return JSONResponse(content={"error": "Model not loaded yet"}, status_code=503)
 
-        API reference:
-            - https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html
-        """
         logger.info(f"Request: {request}")
         generator = await self.openai_serving_chat.create_chat_completion(
             request, raw_request
@@ -84,11 +87,6 @@ class VLLMDeployment:
 
 
 def parse_vllm_args(cli_args: Dict[str, str]):
-    """Parses vLLM args based on CLI inputs.
-
-    Currently uses argparse because vLLM doesn't expose Python models for all of the
-    config options we want to support.
-    """
     parser = make_arg_parser()
     arg_strings = []
     for key, value in cli_args.items():
@@ -97,38 +95,16 @@ def parse_vllm_args(cli_args: Dict[str, str]):
     parsed_args = parser.parse_args(args=arg_strings)
     return parsed_args
 
-
-def build_app(args: Dict[str, str]) -> serve.Application:
-    """Builds the Serve app based on CLI arguments.
-
-    See https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html#command-line-arguments-for-the-server
-    for the complete set of arguments.
-
-    Supported engine arguments: https://docs.vllm.ai/en/latest/models/engine_args.html.
-    """  # noqa: E501
-    # args['model'] = '/data/model/Mistral-7B-Instruct-v02-AWQ'
-    # args['tensor-parallel-size'] = '1'
+def build_llm_app(args: Dict[str, str]) -> serve.Application:
     parsed_args = parse_vllm_args(args)
     engine_args = AsyncEngineArgs.from_cli_args(parsed_args)
     engine_args.worker_use_ray = True
-    # engine_args.max_model_len = 8192
 
     tp = engine_args.tensor_parallel_size
-    logger.info(f"Tensor parallelism = {tp}")
-    pg_resources = []
-    pg_resources.append({"CPU": 1})  # for the deployment replica
-    for i in range(tp):
-        pg_resources.append({"CPU": 1, "GPU": 1})  # for the vLLM actors
 
-    # We use the "STRICT_PACK" strategy below to ensure all vLLM actors are placed on
-    # the same Ray node.
-    return VLLMDeployment.options(
-        placement_group_bundles=pg_resources, placement_group_strategy="PACK"
-    ).bind(
+    return VLLMDeployment.bind(
         engine_args,
         parsed_args.response_role,
         parsed_args.lora_modules,
         parsed_args.chat_template,
     )
-
-deployment_graph = build_app({})

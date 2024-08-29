@@ -1,34 +1,23 @@
 apiVersion: ray.io/v1
 kind: RayService
 metadata:
-  name: rayservice-sample
+  name: rayservice-vllm
 spec:
   serveConfigV2: |
     applications:
       - name: vllm_app
         route_prefix: /vllm
-        import_path: llm.build_app
+        import_path: llm.build_llm_app
         runtime_env:
           working_dir: "https://github.com/taigetco/ray-worker/raw/main/llm.zip"
         args:
           model: '/data/model/Mistral-7B-Instruct-v02-AWQ'
-          tensor-parallel-size: 1
-          max-model-len: 8192
-        # deployments:
-        #   - name: VLLMDeployment
-        #     model: "/data/model/Mistral-7B-Instruct-v02-AWQ"
-        #     tensor-parallel-size: 1
+          tensor-parallel-size: 2
   rayClusterConfig:
-    rayVersion: '2.9.0' # should match the Ray version in the image of the containers
-    ######################headGroupSpecs#################################
-    # Ray head pod template.
+    rayVersion: '2.9.0'
     headGroupSpec:
-      # The `rayStartParams` are used to configure the `ray start` command.
-      # See https://github.com/ray-project/kuberay/blob/master/docs/guidance/rayStartParams.md for the default settings of `rayStartParams` in KubeRay.
-      # See https://docs.ray.io/en/latest/cluster/cli.html#ray-start for all available options in `rayStartParams`.
       rayStartParams:
         dashboard-host: '0.0.0.0'
-      #pod template
       template:
         spec:
           volumes:
@@ -44,11 +33,11 @@ spec:
               imagePullPolicy: Never
               resources:
                 limits:
-                  cpu: 8
-                  memory: 20Gi
+                  cpu: 2
+                  memory: 4Gi
                 requests:
-                  cpu: 8
-                  memory: 20Gi
+                  cpu: 2
+                  memory: 4Gi
               ports:
                 - containerPort: 6379
                   name: gcs-server
@@ -62,17 +51,11 @@ spec:
                 - mountPath: /data/model/Mistral-7B-Instruct-v02-AWQ
                   name: model
     workerGroupSpecs:
-      # the pod replicas in this group typed worker
       - replicas: 1
         minReplicas: 1
         maxReplicas: 5
-        # logical group name, for this called small-group, also can be functional
         groupName: vllm-group
-        # The `rayStartParams` are used to configure the `ray start` command.
-        # See https://github.com/ray-project/kuberay/blob/master/docs/guidance/rayStartParams.md for the default settings of `rayStartParams` in KubeRay.
-        # See https://docs.ray.io/en/latest/cluster/cli.html#ray-start for all available options in `rayStartParams`.
         rayStartParams: {}
-        #pod template
         template:
           spec:
             nodeSelector:
@@ -86,23 +69,18 @@ spec:
               - name: ray-worker # must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc'
                 image: docker.io/library/rayvllm:latest
                 imagePullPolicy: Never
-                env:
-                  - name: HF_ENDPOINT
-                    value: https://hf-mirror.com
-                  - name: HUGGING_FACE_HUB_TOKEN
-                    value: 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
                 lifecycle:
                   preStop:
                     exec:
                       command: ["/bin/sh","-c","ray stop"]
                 resources:
                   limits:
-                    cpu: "7"
-                    memory: "18Gi"
+                    cpu: "2"
+                    memory: "4Gi"
                     nvidia.com/gpu: "1"
                   requests:
-                    cpu: "4"
-                    memory: "18Gi"
+                    cpu: "2"
+                    memory: "4Gi"
                     nvidia.com/gpu: "1"
                 volumeMounts:
                   - mountPath: /data/model/Mistral-7B-Instruct-v02-AWQ
